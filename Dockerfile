@@ -1,15 +1,12 @@
 FROM golang:1.26.4-alpine AS build
 
 RUN apk add --no-cache ca-certificates
-
 WORKDIR /src
 
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY cmd ./cmd
-COPY pkg ./pkg
-
+COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/cf-router ./cmd
 RUN mkdir -p /out/data
 
