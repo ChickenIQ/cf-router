@@ -3,17 +3,14 @@ package forwarder
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
 	"net"
-
-	"golang.org/x/sync/errgroup"
+	"strings"
 )
 
-func ForwardConn(ctx context.Context, dialer Dialer, listenAddr, destAddr string) error {
-	l, err := net.Listen("tcp", listenAddr)
+func ForwardConn(ctx context.Context, dialer Dialer, addr AddrPair) error {
+	l, err := net.Listen("tcp", addr.Local)
 	if err != nil {
-		return fmt.Errorf("error listening on %s %s", listenAddr, err.Error())
+		return fmt.Errorf("error listening on %s %s", addr.Local, err.Error())
 	}
 	defer l.Close()
 
@@ -32,55 +29,32 @@ func ForwardConn(ctx context.Context, dialer Dialer, listenAddr, destAddr string
 			return fmt.Errorf("error accepting connection %s", err.Error())
 		}
 
-		go connect(ctx, dialer, local, destAddr)
+		go connect(ctx, dialer, local, addr.Remote)
 	}
-
 }
 
-func connect(ctx context.Context, dialer Dialer, local net.Conn, upstreamAddr string) {
-	defer local.Close()
+func ParseAddrs(value string) ([]AddrPair, error) {
+	var addrs []AddrPair
 
-	dialCtx, cancel := context.WithTimeout(ctx, dialer.Timeout)
-	defer cancel()
-
-	upstream, err := dialer.DialContext(dialCtx, "tcp", upstreamAddr)
-	if err != nil {
-		if ctx.Err() == nil {
-			log.Printf("error dialing %s %s", upstreamAddr, err.Error())
+	for pair := range strings.SplitSeq(value, ",") {
+		if pair == "" {
+			return nil, fmt.Errorf("empty addr pair")
 		}
-		return
+
+		listen, upstream, ok := strings.Cut(pair, "=")
+		if !ok || listen == "" || upstream == "" {
+			return nil, fmt.Errorf("invalid addr pair %q", pair)
+		}
+
+		addrs = append(addrs, AddrPair{
+			Local:  listen,
+			Remote: upstream,
+		})
 	}
-	defer upstream.Close()
 
-	if err := copyConn(ctx, local, upstream); err != nil && err.Error() != "done" {
-		log.Printf("error forwarding connection %s", err.Error())
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("empty addr pairs")
 	}
-}
 
-func copyConn(ctx context.Context, from, to net.Conn) error {
-	ctx, cancel := context.WithCancel(ctx)
-	eg, _ := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		io.Copy(from, to)
-		cancel()
-
-		return fmt.Errorf("done")
-	})
-
-	eg.Go(func() error {
-		io.Copy(to, from)
-		cancel()
-
-		return fmt.Errorf("done")
-	})
-
-	eg.Go(func() error {
-		<-ctx.Done()
-		from.Close()
-		to.Close()
-
-		return fmt.Errorf("done")
-	})
-
-	return eg.Wait()
+	return addrs, nil
 }

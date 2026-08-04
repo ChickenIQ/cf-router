@@ -9,6 +9,11 @@ import (
 type DialContext func(context.Context, string, string) (net.Conn, error)
 
 type Dialer struct {
-	Timeout     time.Duration
-	DialContext DialContext
+	Timeout time.Duration
+	Context DialContext
+}
+
+type AddrPair struct {
+	Local  string
+	Remote string
 }

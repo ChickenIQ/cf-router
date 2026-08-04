@@ -1,4 +1,4 @@
-module github.com/chickeniq/cf-router-go
+module github.com/chickeniq/cf-router
 
 go 1.26.4
 
@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/chickeniq/warp-wg-go v0.0.0-20260804212621-6a84e141a6a4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/exp v0.0.0-20260709172345-9ea1abe57597 // indirect
